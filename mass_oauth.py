@@ -1,5 +1,14 @@
+# for catching full tracebacks on error
 from sys import exc_info
+
+import time
+
+# for automating browsers
 from selenium import webdriver
+
+# for setting up proxy
+from selenium.webdriver.common.proxy import Proxy, ProxyType
+
 import tweepy
 import random
 import logging
@@ -16,25 +25,40 @@ from urllib.parse import parse_qs
 import json
 
 # to record time when auth was attempted
+# and to delay data entry
+import time
 import datetime
-from datetime import timezone
 
 
 # Get random browser
 def getBrowser():
-    all_drivers = ['chromedriver', 'geckodriver', 'operadriver']
-    selected_driver = all_drivers[random.randrange(0, 1)]  # choose only chromdriver for now
+    try:
+        all_drivers = ['chromedriver', 'geckodriver', 'operadriver']
+        selected_driver = all_drivers[random.randrange(0, 1)]  # choose only chromdriver for now
 
-    dir = f'{Path(__file__).resolve().parent}'
+        # Get proxy to make requests from different IP address everytime
+        ip_address = '110.74.195.65:8000'
+        proxy = Proxy()
+        proxy.proxy_type = ProxyType.MANUAL
+        proxy.autodetect = False
+        proxy.http_proxy = proxy.socks_proxy = proxy.ssl_proxy = ip_address
 
-    if selected_driver == 'chromedriver':
-        driver = webdriver.Chrome(f'{dir}/chromedriver')
-    elif selected_driver == 'geckodriver':
-        driver = webdriver.Firefox(f'{dir}/geckodriver')
-    else:
-        driver = webdriver.Opera(f'{dir}/operadriver')
+        dir = f'{Path(__file__).resolve().parent}'
 
-    return (selected_driver, driver)
+        if selected_driver == 'chromedriver':
+            options = webdriver.ChromeOptions()
+            options.proxy = proxy
+            options.add_argument("ignore-certificate-errors")
+            driver = webdriver.Chrome(f'{dir}/chromedriver', options=options)
+        elif selected_driver == 'geckodriver':
+            driver = webdriver.Firefox(f'{dir}/geckodriver')
+        else:
+            driver = webdriver.Opera(f'{dir}/operadriver')
+    except Exception as e:
+        driver = None
+        print(e)
+
+    return (f"{selected_driver}:{ip_address}", driver)
 
 
 # Test function
@@ -58,55 +82,63 @@ def get_redirect_url(auth):
         return 'error'
 
 
-def saveResults(results_file, success, username, browser, time, access, secret, screenshot, error):
+def saveResults(results_file, success, username, email, password, followers, created, country, browser, time, access, secret, screenshot, error):
     # load file
     try:
         results = json.load(open(results_file, 'r'))
-
-        if success == True:
-            {
-                "username": username, "browser": browser,
-                "tokens": {"access_token": access, "access_secret": secret},
-                "time": time
-            }
-        else:
-            {
-                "username": username, "browser": browser,
-                "time": time, "screenshot": screenshot,
-                "error": error
-            }
-
     except Exception:
         results = {}  # initialize to an empty dictionary
 
+    if success == True:
+        results[username] = {
+            "email": email, "password": password,
+            "tokens": {"access_token": access, "access_secret": secret},
+            "followers": followers, "created": created, "country": country,
+            "auth_attempt": {"browser": browser, "time": time},
+        }
+    else:
+        results[username] = {
+            "email": email, "password": password,
+            "followers": followers, "created": created, "country": country,
+            "auth_attempt": {"browser": browser, "time": time},
+            "screenshot": screenshot, "error": error
+        }
 
-def twitterLogin(username, password, two_factor=False):
+    with open(results_file, 'w') as f:
+        f.write(json.dumps(results, indent=4))
+
+
+def twitterLogin(email, password, username, followers, created, country, two_factor=False):
     try:
         # pick a random browser
         driver_and_browser = getBrowser()
         driver = driver_and_browser[1]
         browser = driver_and_browser[0]
-        time = datetime.datetime.now(timezone.utc)
+        auth_time = datetime.datetime.now(datetime.timezone.utc)
 
         # Authenticate to the app
         consumer_token = os.environ.get('CONSUMER_TOKEN')
         consumer_secret = os.environ.get('CONSUMER_SECRET')
-        callback_url = 'http://127.0.0.1:8000/signup'  # just a dummy callback url, doesn't really do anything
+        callback_url = 'http://127.0.0.1'  # just a dummy callback url, doesn't really do anything
         auth = tweepy.OAuthHandler(consumer_token, consumer_secret, callback_url)
 
         # Go to twitter auth page
         url = get_redirect_url(auth)
+
         driver.get(url)
 
+        time.sleep(3)
+
         # Input credentials
-        driver.find_element_by_name('session[username_or_email]').send_keys(username)
+        driver.find_element_by_name('session[username_or_email]').send_keys(email)
+        time.sleep(3)
         driver.find_element_by_name('session[password]').send_keys(password)
 
         # click on the allow button
-        driver.find_element_by_id('allow')
+        driver.find_element_by_id('allow').click()
 
         # Get the url parameters returned
-        keys_url = driver.getCurrentUrl()
+        keys_url = driver.current_url
         parsed = urlparse.urlparse(keys_url)
         auth_token = parse_qs(parsed.query)['oauth_token'][0]
         verifier = parse_qs(parsed.query)['oauth_verifier'][0]
@@ -115,10 +147,22 @@ def twitterLogin(username, password, two_factor=False):
         auth.request_token = {'oauth_token': auth_token, 'oauth_token_secret': verifier}
         keys = auth.get_access_token(verifier)
 
-        saveResults('success.json', True, username, browser, str(time), keys[0], keys[1], None, None)
+        saveResults(
+            'success.json', True, username, email,
+            password, followers, created, country, browser,
+            str(auth_time), keys[0], keys[1],
+            None, None
+        )
     except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(e, exc_info=True)
         driver.save_screenshot(f'{username}.png')
-        saveResults('fail.json', False, username, browser, str(time), None, None, f'{username}.png', e)
+        saveResults(
+            'fail.json', False, username, email,
+            password, followers, created, country, browser,
+            str(auth_time), None, None,
+            f'{username}.png', str(e)
+        )
 
 
 def authenticate_accounts():
@@ -135,6 +179,10 @@ def authenticate_accounts():
             password = credentials[1].replace(' ', '')
 
             username = attributes[1].split(': ')[1].replace(' ', '')
+
+            followers = attributes[2].split(': ')[1].replace(' ', '')
+            created = attributes[3].split(': ')[1].replace(' ', '')
+            country = attributes[4].split(': ')[1]
             two_factor = False
 
             # check whether is 2FA or not
@@ -142,13 +190,10 @@ def authenticate_accounts():
                 # this is 2FA
                 two_factor = True
 
-            # twitterLogin(email, password, two_factor)
+            twitterLogin(email, password, username, followers, created, country, two_factor)
 
         except Exception as e:
             print(e)
 
 
-# authenticate_accounts()
-
-# Test
-# login('email', 'password')
+authenticate_accounts()
