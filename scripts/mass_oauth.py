@@ -31,15 +31,14 @@ import datetime
 # to match urls
 import re
 
-# to randomize user agent
-from selenium.webdriver.chrome.options import Options
-from fake_useragent import UserAgent
-
 # for solving recaptchas
 from anticaptcha import solveRecaptcha
 
 # to randomize ip address
 from smartproxy import getRandomIP
+
+# to accpet CL arguments
+import sys
 
 
 # Get random browser
@@ -50,12 +49,6 @@ def getWebDriver():
         proxy = f'{proxy_ip}:{proxy_port}'
 
         dir = f'{Path(__file__).resolve().parent.parent}'
-
-        options = Options()
-        ua = UserAgent()
-        userAgent = ua.random
-        print(userAgent)
-        options.add_argument(f'user-agent={userAgent}')
 
         webdriver.DesiredCapabilities.CHROME['proxy']={
             "httpProxy":proxy,
@@ -110,7 +103,7 @@ def saveResults(results_file, success, username, email, password, followers, cre
         f.write(json.dumps(results, indent=4))
 
 
-def getTokensOrHandleRedirects(driver):
+def getTokensOrHandleRedirects(driver, username, email):
     # Get the current url to know status
     url = driver.current_url
 
@@ -121,9 +114,8 @@ def getTokensOrHandleRedirects(driver):
         challenge_response = username
 
         if re.search('challenge_type=RetypePhoneNumber', url) is not None:
-            # try to change challenge type to screen name
-            # driver.navigate().to(re.sub('challenge_type=RetypePhoneNumber', 'challenge_type=RetypeScreenName', url))
-            driver.execute_script('document.getElementsByName("challenge_type")[0].value = "RetypeScreenName"')
+            # we can't take care of this for now, so just pass
+            pass
 
         driver.find_element_by_name('challenge_response').send_keys(challenge_response)
         driver.find_element_by_id('email_challenge_submit').click()
@@ -144,6 +136,8 @@ def getTokensOrHandleRedirects(driver):
 
 
 def twitterLogin(email, password, username, followers, created, country, two_factor=False):
+    accounts_dir = f'{Path(__file__).resolve().parent.parent}/accounts/'
+
     try:
         # configure browser
         driver = getWebDriver()
@@ -171,57 +165,73 @@ def twitterLogin(email, password, username, followers, created, country, two_fac
         # click on the allow button
         driver.find_element_by_id('allow').click()
 
-        tokens = getTokensOrHandleRedirects(driver)
+        tokens = getTokensOrHandleRedirects(driver, username, email)
 
         # Get and save the keys
         auth.request_token = {'oauth_token': tokens[0], 'oauth_token_secret': tokens[1]}
         keys = auth.get_access_token(tokens[1])
 
         saveResults(
-            'success.json', True, username, email,
+            f'{accounts_dir}authenticated_accounts.json', True, username, email,
             password, followers, created, country,
             str(auth_time), keys[0], keys[1],
             None, None, None
         )
     except Exception as e:
+        screenshots_dir = f'{Path(__file__).resolve().parent.parent}/screenshots/'
         logger = logging.getLogger(__name__)
         logger.error(e, exc_info=True)
-        driver.save_screenshot(f'{username}.png')
+        driver.save_screenshot(f'{screenshots_dir}{username}.png')
         saveResults(
-            'fail.json', False, username, email,
+            f'{accounts_dir}failed_accounts.json', False, username, email,
             password, followers, created, country,
             str(auth_time), None, None,
-            f'{username}.png', str(e), url
+            f'{screenshots_dir}{username}.png', str(e), url
         )
         time.sleep(3600)
 
 
-def authenticate_accounts():
-    with open('accounts.txt', 'r') as accounts_file:
-        accounts = accounts_file.read().split('\n')
+def authenticate_accounts(retry_failed=False):
+    retry_failed = False
+
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'retry-failed':
+            retry_failed = True
+
+    accounts_dir = f'{Path(__file__).resolve().parent.parent}/accounts/'
+
+    try:
+        all_accounts = json.load(open(f'{accounts_dir}all_accounts.json', 'r'))
+        authenticated = list(json.load(open(f'{accounts_dir}authenticated_accounts.json', 'r')).keys())
+        failed = list(json.load(open(f'{accounts_dir}failed_accounts.json', 'r')).keys())
+    except Exception as e:
+        print(f"There was a problem opening an accounts file: {e}")
+        exit()
+
+    if retry_failed:
+        exclude = authenticated
+    else:
+        exclude = authenticated + failed
+
+    for key in exclude:
+        all_accounts.pop(key)
+
+    print(f'Retrieved {len(all_accounts)} accounts. Attempting authentication')
 
     # Read accounts from the right source later
-    for account in accounts:
+    for account in all_accounts:
         try:
-            attributes = account.split('|')
+            email = all_accounts[account]['email']
+            password = all_accounts[account]['password']
 
-            credentials = attributes[0].split(': ')[1].split(':')
-            email = credentials[0]
-            password = credentials[1].replace(' ', '')
+            followers = all_accounts[account]['followers']
+            created = all_accounts[account]['created']
+            country = all_accounts[account]['country']
+            two_factor = all_accounts[account]['two_factor']
 
-            username = attributes[1].split(': ')[1].replace(' ', '')
+            print(f'@{account}')
 
-            followers = attributes[2].split(': ')[1].replace(' ', '')
-            created = attributes[3].split(': ')[1].replace(' ', '')
-            country = attributes[4].split(': ')[1]
-            two_factor = False
-
-            # check whether is 2FA or not
-            if len(attributes) > 5:
-                # this is 2FA
-                two_factor = True
-
-            twitterLogin(email, password, username, followers, created, country, two_factor)
+            twitterLogin(email, password, account, followers, created, country, two_factor)
 
         except Exception as e:
             print(e)
