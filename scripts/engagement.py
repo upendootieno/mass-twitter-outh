@@ -88,7 +88,7 @@ def addTweet():
     tweet = random.choice(tweets)
 
     # authenticate a random account
-    api = authenticate(account='TechniCollins')
+    api = authenticate(select_random=True)
 
     # publish the tweet
     api[1].update_status(tweet)
@@ -97,19 +97,30 @@ def addTweet():
     return
 
 
-# def likeTweet():
-#     create_favorite(id)
-#     return
+def likeTweet(tweet_id):
+    api = authenticate(select_random=True)
+    api[1].create_favorite(id=tweet_id)
+    return
 
 
-# def retweet():
-#     retweet(id)
-#     return
+def retweet(tweet_id):
+    api = authenticate(select_random=True)
+    api[1].retweet(id=tweet_id)
+    return
 
 
-# def reply():
-#     update_status(status, in_reply_to_status_id)
-#     return
+def reply(tweet_id):
+    # open the comments file and put all the comments in a list
+    with open(f'{root_dir}/.config/comments.txt', 'r') as tweets_file:
+        tweets = tweets_file.read().split('\n')
+
+    # select a random tweet from the list
+    tweet = random.choice(tweets)
+
+    # authenticate a random account
+    api = authenticate(select_random=True)
+    api[1].update_status(status=tweet, in_reply_to_status_id=tweet_id)
+    return
 
 
 # def unfollow():

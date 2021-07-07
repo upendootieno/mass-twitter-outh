@@ -49,7 +49,7 @@ f(x) = a(1+r)<sup>x</sup>
 Where a is the initial number of followers, r is the percentage in growth expressed as float, and x the growth factor in days. The growth rate will be limited to a very small number, for instance 0.01. In this case, it means that the follower count for the user would increase by 1% every x days.
 
 
-## UNFOLLOW ALGORITHMS
+## UNFOLLOW ALGORITHM
 
 To keep things even more realistic, a calculated number of unfollowers will be implemented.
 
