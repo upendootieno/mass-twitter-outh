@@ -9,7 +9,22 @@ To bypass reCAPTCHA V2, we'll need a recaptcha solve service. Create an account 
 #### Configurations
 1: Take note of your api key.
 
+
 2: To keep the expenses practical, set your maximum bid to $3 for every 1000 captchas. The codebase has been designed to tolerate lower bid rates by waiting for workers to be idle.
+
+### SmartProxy
+
+1: Get authentication token and user id by running the command below.
+
+    python smartproxy.py gettoken
+
+This requires the presence of the 'PROXY_USERNAME' and 'PROXY_PASSWORD' env variables.
+Store the results in the 'PROXY_USER_ID' and 'PROXY_TOKEN' env variables.
+
+
+2: Whitelist your IP address by running the command below, replacing the sample IP address with yours. You may have to overwrite existing IP addresses if you have reached your cap.
+
+    python smartproxy.py whitelist '192.168.0.1'
 
 ### .config/make_me_feel_famous.json
 This file contains the account(s) that the authenticated accounts will engage with ie the accounts that will be followed, get their tweets liked, responded to, retweeted etc. Use this sample to configure the file;
@@ -95,6 +110,11 @@ Defaults to empty json.
 To authenticate accounts, run; `python mass_oauth.py`. This will attempt authentication for accounts defined in `all_accounts.json`, but not present in `authenticated_accounts.json`
 
 
+By default, the script attempts to log in with email. If you want to switch to username login, run;
+
+`python mass_oauth.py --username-login`
+
+
 You can pass a command line argument to also re-attempt authentication for the accounts that had previously failed;
 
-`python mass_oauth.py retry-failed`
+`python mass_oauth.py --retry-failed`
