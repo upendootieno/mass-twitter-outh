@@ -118,3 +118,10 @@ By default, the script attempts to log in with email. If you want to switch to u
 You can pass a command line argument to also re-attempt authentication for the accounts that had previously failed;
 
 `python mass_oauth.py --retry-failed`
+
+
+# TROUBLESHOOTING
+
+1: "This version of ChromDriver only supports chrome version xx"
+
+You need to download a chromedriver version that matches your chrome browser and store it in the drivers directory.
