@@ -81,7 +81,7 @@ def getWebDriver():
             print('Unsupported Operating System')
             exit()
 
-        driver = webdriver.Chrome(executable_path=f'{dir}/drivers/chromedriver')
+        driver = webdriver.Chrome(executable_path=f'{executable_location}')
     except Exception as e:
         print(e)
         exit()
@@ -101,6 +101,12 @@ def get_redirect_url(auth):
 
 
 def saveResults(results_file, success, username, email, password, followers, created, country, time, access, secret, screenshot, error, url):
+    # This is a critical section, so we'll lock it to avoid
+    # inconsistencies in data that may result from multiple
+    # threads trying to work on the same file
+    global lock
+    lock.acquire()
+
     # load file
     try:
         results = json.load(open(results_file, 'r'))
@@ -124,6 +130,8 @@ def saveResults(results_file, success, username, email, password, followers, cre
 
     with open(results_file, 'w') as f:
         f.write(json.dumps(results, indent=4))
+
+    lock.release()
 
 
 def getTokensOrHandleRedirects(driver, username, email, username_login, auth):
@@ -329,4 +337,6 @@ def main():
 
 
 if __name__ == '__main__':
+    # Define lock that will control file I/O
+    lock = threading.Lock()
     main()
