@@ -55,10 +55,10 @@ After editing the file, you will need to run this command to set up a growth sch
 
 The command will set up a cron job for each account in the file, that will run every `growthInterval` days. If some accounts already have cron jobs, they will be overwritten.
 
-###.config/tweets.txt
+## .config/tweets.txt
 Store the tweets you want the accounts to publish here. A tweet and an account that publishes it will be selected at random.
 
-## .config/replies.txt
+## .config/comments.txt
 Store the responses to tweets you want your accounts to send.
 
 ## Environment Variables
@@ -149,9 +149,9 @@ If there's a new tweet, it is assigned a random number of likes and retweets, be
 ## Job Scheduling
 All scripts that need to be run at specific times are run from cron jobs.
 
-The format for each cronjob is `cron-job #comment`. For example, this cron job is for following an account;
+The format for each cronjob is `cron-job # comment`. For example, this cron job is for following an account;
 
-    python scripts/engagement.py --follow-account cl1973 TaraHer77162822
+    python scripts/engagement.py --follow-account cl1973 TaraHer77162822 # cl1973_TaraHer77162822
 
 
 After running the scheduled tasks, the cron job is deleted.
