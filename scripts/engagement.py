@@ -6,6 +6,13 @@ from pathlib import Path
 
 import random
 
+# to accpet CL arguments
+import sys
+import argparse
+
+# for deleting successfully executed jobs
+import cronjob
+
 root_dir = f'{Path(__file__).resolve().parent.parent}/'
 
 
@@ -76,6 +83,10 @@ def follow(account_to_follow, follower):
     except Exception as e:
         print(f"Failed to update accounts file : {e}")
 
+    # delete the cronjob associated so that we don't
+    # run the job again the next year :)
+    cronjob.deleteCronJob(f'{account_to_follow}_{follower}')
+
     return
 
 
@@ -97,15 +108,21 @@ def addTweet():
     return
 
 
-def likeTweet(tweet_id):
-    api = authenticate(select_random=True)
-    api[1].create_favorite(id=tweet_id)
+def likeTweet(tweet_id, account):
+    api = authenticate(account)[1]
+    api.create_favorite(id=tweet_id)
+    print(f"Liked {tweet_id}")
+
+    cronjob.deleteCronJob(f'retweet_{tweet_id}_{account}')
     return
 
 
-def retweet(tweet_id):
-    api = authenticate(select_random=True)
-    api[1].retweet(id=tweet_id)
+def retweetStatus(tweet_id, account):
+    api = authenticate(account)[1]
+    api.retweet(id=tweet_id)
+    print(f"Retweeted {tweet_id}")
+
+    cronjob.deleteCronJob(f'retweet_{tweet_id}_{account}')
     return
 
 
@@ -123,14 +140,37 @@ def reply(tweet_id):
     return
 
 
-# def unfollow():
-#     destroy_friendship(screen_name)
-#     return
+def main():
+    # Get command line arguments to determine which function to run
+    parser = argparse.ArgumentParser(description='Engage with accounts or tweets')
 
+    parser.add_argument('--follow-account', nargs=2,
+                        help='Follow the account with the specified twitter handle')
+    parser.add_argument('--like-tweet', nargs=2,
+                        help='Favorite the tweet with the given ID')
+    parser.add_argument('--retweet', nargs=2,
+                        help='Retweet the tweet with the specified ID')
+
+    args = parser.parse_args()
+
+    follow_account = args.follow_account
+    like_tweet = args.like_tweet
+    retweet = args.retweet
+
+    if follow_account:
+        follow(follow_account[0], follow_account[1])
+    elif like_tweet:
+        likeTweet(like_tweet[0], like_tweet[1])
+    elif retweet:
+        retweetStatus(retweet[0], retweet[1])
+
+    return
+
+if __name__ == '__main__':
+    main()
 
 """
 TO DO
-
-1. Randomize number of likes/retweets
-3. Comment from a random pool of comments
+1. Tweet from a random account
+2. Comment from a random pool of comments
 """
