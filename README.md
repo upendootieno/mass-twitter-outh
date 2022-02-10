@@ -1,3 +1,7 @@
+## DISCLAIMER
+
+This was an experimental project I did a while back for a client. His goal was to find out whether having many social media followers (specifically Twitter) could make him seem famous. I wrote these scripts to authenticate to users he bought from God knows where, and to make those users interact among themselves and with the client's account. It has everything from bypassing CAPTCHA, to simulating organic growth. Most of the functionality goes against Twitter TOS and even though I never used the script myself, I regret building the tools for someone to break rules, regardless of their intentions. sike. I'm making this public for anyone who wants to learn from this, but please don't abuse Twitter. sike.
+
 # INITIAL CONFIGURATION
 
 ## Location
